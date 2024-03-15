@@ -1,6 +1,8 @@
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
+use dotenv::dotenv;
 use log::{debug, info};
 use serde_json::Value;
+use std::env;
 
 async fn post_message_to_kafka(topic_name: &String, message: &Value) {}
 
@@ -25,11 +27,19 @@ async fn post_message_handle(req_body: web::Json<RequestData>) -> impl Responder
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    dotenv().ok();
+
     pretty_env_logger::init();
-    info!("Starting server at");
+
+    let port = env::var("APP_PORT")
+        .unwrap_or_else(|_| "8080".to_string())
+        .parse::<u16>()
+        .expect("PORT must be a number");
+
+    info!("Starting server at 0.0.0.0:{}", port);
 
     HttpServer::new(|| App::new().service(post_message_handle))
-        .bind(("0.0.0.0", 8888))?
+        .bind(("0.0.0.0", port))?
         .run()
         .await
 }
