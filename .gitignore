@@ -18,3 +18,7 @@ Cargo.lock
 # Added by cargo
 /target
 /.idea/.gitignore
+/.idea/aws.xml
+/.idea/modules.xml
+/.idea/rest2kafka.iml
+/.idea/vcs.xml
