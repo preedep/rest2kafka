@@ -14,9 +14,9 @@ path = "src/main_worker.rs"
 
 
 [dependencies]
-actix-web = "4.5"
+actix-web = "4"
 kafka = "0.10"
 log = "0.4"
 pretty_env_logger = "0.5"
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
