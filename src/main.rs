@@ -1,3 +1,5 @@
+use std::env;
+
 use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
 use dotenv::dotenv;
 use kafka::client::{
@@ -6,7 +8,6 @@ use kafka::client::{
 use kafka::producer::{AsBytes, Producer, Record, DEFAULT_ACK_TIMEOUT_MILLIS};
 use log::{debug, error, info};
 use serde_json::Value;
-use std::env;
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 struct KafkaConfig {
