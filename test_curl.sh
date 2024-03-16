@@ -1,4 +1,4 @@
 curl -v --header "Content-Type: application/json" \
   --request POST \
-  --data '{"topicName":"testdev001","message":{"username":"xyz","password":"xyz"}}' \
+  --data '{"topicName":"eventhub1","message":{"username":"xyz","password":"xyz"}}' \
   http://localhost:8888/post_message
