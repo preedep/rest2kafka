@@ -25,3 +25,6 @@ Cargo.lock
 /terraform/.terraform.lock.hcl
 /terraform/.terraform/providers/registry.terraform.io/hashicorp/azurerm/3.96.0/darwin_arm64/terraform-provider-azurerm_v3.96.0_x5
 /terraform/.terraform/providers/registry.terraform.io/hashicorp/random/3.6.0/darwin_arm64/terraform-provider-random_v3.6.0_x5
+/terraform/dev-plan
+/terraform/terraform.tfstate.backup
+/terraform/terraform.tfstate
