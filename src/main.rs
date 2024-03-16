@@ -1,7 +1,9 @@
 use std::env;
+use std::fmt::{Debug, Display, Formatter};
 
 use actix_web::middleware::Logger;
-use actix_web::{middleware, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware, post, web, App, HttpResponse, HttpServer, Responder, ResponseError, HttpRequest};
+use derive_more::{Display, Error};
 use dotenv::dotenv;
 use log::{debug, error, info};
 use rdkafka::error::KafkaError;
@@ -9,6 +11,7 @@ use rdkafka::message::OwnedMessage;
 use rdkafka::producer::future_producer::OwnedDeliveryResult;
 use rdkafka::util::Timeout;
 use rdkafka::ClientConfig;
+use serde::Serialize;
 use serde_json::Value;
 
 // This struct represents state
@@ -29,8 +32,46 @@ struct RequestData {
     #[serde(rename = "message")]
     pub message: Value,
 }
+
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug,Display, Error)]
+struct Error {
+    message: String,
+}
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
-struct Response {}
+struct Rest2KafkaResponse {
+    pub message: String,
+}
+impl Rest2KafkaResponse {
+    pub fn new(message: &str) -> Rest2KafkaResponse {
+        Rest2KafkaResponse {
+            message: message.to_string(),
+        }
+    }
+}
+impl Responder for Rest2KafkaResponse {
+    type Body = actix_web::body::BoxBody;
+
+    fn respond_to(self, req: &HttpRequest) -> HttpResponse<Self::Body> {
+        HttpResponse::Ok().json(self)
+    }
+}
+
+type Rest2KafkaResult = Result<Rest2KafkaResponse, Rest2KafkaError>;
+
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug,Display, Error)]
+struct Rest2KafkaError {
+    message: String,
+}
+
+impl ResponseError for Rest2KafkaError {
+    fn status_code(&self) -> actix_web::http::StatusCode {
+        actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
+    }
+
+    fn error_response(&self) -> actix_web::HttpResponse {
+        actix_web::HttpResponse::InternalServerError().json(self)
+    }
+}
 
 fn log_produce_result(
     topic: &str,
@@ -66,7 +107,7 @@ async fn post_message_to_kafka(
 async fn post_message_handle(
     req_body: web::Json<RequestData>,
     state: web::Data<AppState>,
-) -> impl Responder {
+) -> Rest2KafkaResult {
     debug!("Post message handle : {:#?}", req_body);
 
     //let producer: rdkafka::producer::FutureProducer =
@@ -74,8 +115,8 @@ async fn post_message_handle(
 
     post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
 
-    let response = Response {};
-    HttpResponse::Ok().json(response)
+    let response = Rest2KafkaResponse::new("Message sent to Kafka");
+    Ok(response)
 }
 
 #[actix_web::main]
