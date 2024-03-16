@@ -1,3 +1,5 @@
+mod utils;
+
 use std::env;
 use std::fmt::{Debug, Display, Formatter};
 
@@ -15,6 +17,7 @@ use rdkafka::util::Timeout;
 use rdkafka::ClientConfig;
 use serde::Serialize;
 use serde_json::Value;
+use crate::utils::KafkaConfig;
 
 // This struct represents state
 struct AppState {
@@ -22,11 +25,7 @@ struct AppState {
     //client_config: rdkafka::ClientConfig,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
-struct KafkaConfig {
-    pub bootstrap_servers: String,
-    pub connection_string: String,
-}
+
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 struct RequestData {
     #[serde(rename = "topicName")]
