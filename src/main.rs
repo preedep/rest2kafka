@@ -7,6 +7,8 @@ use log::{debug, error, info};
 use rdkafka::error::KafkaError;
 use rdkafka::message::OwnedMessage;
 use rdkafka::ClientConfig;
+use rdkafka::producer::future_producer::OwnedDeliveryResult;
+use rdkafka::util::Timeout;
 use serde_json::Value;
 
 // This struct represents state
@@ -47,7 +49,16 @@ async fn post_message_to_kafka(
     producer: &rdkafka::producer::FutureProducer,
     topic_name: &String,
     message: &Value,
-) {
+) -> OwnedDeliveryResult {
+    let result = producer
+        .send(
+            rdkafka::producer::FutureRecord::to(topic_name)
+                .payload(&message.to_string())
+                .key("key"),
+            Timeout::After(std::time::Duration::from_secs(0)),
+        )
+        .await;
+    result
 }
 
 #[post("/post_message")]
@@ -57,7 +68,7 @@ async fn post_message_handle(
 ) -> impl Responder {
     debug!("Post message handle : {:#?}", req_body);
 
-    post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
+    let result = post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
 
     let response = Response {};
     HttpResponse::Ok().json(response)
