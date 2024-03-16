@@ -14,6 +14,7 @@ use serde_json::Value;
 // This struct represents state
 struct AppState {
     producer: rdkafka::producer::FutureProducer,
+    //client_config: rdkafka::ClientConfig,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -49,7 +50,7 @@ async fn post_message_to_kafka(
     producer: &rdkafka::producer::FutureProducer,
     topic_name: &String,
     message: &Value,
-) -> OwnedDeliveryResult {
+) {
     let result = producer
         .send(
             rdkafka::producer::FutureRecord::to(topic_name)
@@ -58,7 +59,7 @@ async fn post_message_to_kafka(
             Timeout::After(std::time::Duration::from_secs(0)),
         )
         .await;
-    result
+    let _r = log_produce_result(topic_name, result.clone());
 }
 
 #[post("/post_message")]
@@ -68,8 +69,10 @@ async fn post_message_handle(
 ) -> impl Responder {
     debug!("Post message handle : {:#?}", req_body);
 
-    let result =
-        post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
+    //let producer: rdkafka::producer::FutureProducer =
+    //    state.client_config.create().expect("Producer creation error");
+
+    post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
 
     let response = Response {};
     HttpResponse::Ok().json(response)
@@ -94,7 +97,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     info!("Starting server at 0.0.0.0:{}", port);
-    debug!("Kafak config = :{:#?}", kafka_config);
+    debug!("Kafka config = :{:#?}", kafka_config);
 
     let mut config = ClientConfig::new();
     config.set("bootstrap.servers", &kafka_config.bootstrap_servers);
@@ -103,16 +106,17 @@ async fn main() -> std::io::Result<()> {
     config.set("sasl.username", "$ConnectionString");
     config.set("sasl.password", &kafka_config.connection_string);
 
-    let producer: rdkafka::producer::FutureProducer =
-        config.create().expect("Producer creation error");
-    let app_state = web::Data::new(AppState { producer });
-
+    let producer = config.create().expect("Producer creation error");
+    let app_state = web::Data::new(AppState {
+        producer,
+        //client_config: config,
+    });
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::DefaultHeaders::new().add(("X-Version", "0.2")))
             .wrap(Logger::default())
             .wrap(Logger::new("%a %{User-Agent}i"))
-            .app_data(web::Data::new(app_state.clone()))
+            .app_data(app_state.clone())
             .service(post_message_handle)
     })
     .bind(("0.0.0.0", port))?
