@@ -6,9 +6,9 @@ use dotenv::dotenv;
 use log::{debug, error, info};
 use rdkafka::error::KafkaError;
 use rdkafka::message::OwnedMessage;
-use rdkafka::ClientConfig;
 use rdkafka::producer::future_producer::OwnedDeliveryResult;
 use rdkafka::util::Timeout;
+use rdkafka::ClientConfig;
 use serde_json::Value;
 
 // This struct represents state
@@ -68,7 +68,8 @@ async fn post_message_handle(
 ) -> impl Responder {
     debug!("Post message handle : {:#?}", req_body);
 
-    let result = post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
+    let result =
+        post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
 
     let response = Response {};
     HttpResponse::Ok().json(response)
