@@ -81,20 +81,6 @@ impl ResponseError for Rest2KafkaError {
     }
 }
 
-fn log_produce_result(
-    topic: &str,
-    result: Result<(i32, i64), (KafkaError, OwnedMessage)>,
-) -> Result<(), ()> {
-    result
-        .and_then(|(p, o)| {
-            info!(
-                "Successfully produced record to topic {} partition [{}] @ offset {}",
-                topic, p, o
-            );
-            Ok(())
-        })
-        .map_err(|(err, _)| error!("kafka error: {}", err))
-}
 async fn post_message_to_kafka(
     producer: &rdkafka::producer::FutureProducer,
     topic_name: &String,
