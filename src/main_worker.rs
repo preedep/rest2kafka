@@ -15,15 +15,15 @@ impl ClientContext for CustomContext {}
 
 impl ConsumerContext for CustomContext {
     fn pre_rebalance<'a>(&self, rebalance: &Rebalance<'a>) {
-        info!("Pre rebalance {:?}", rebalance);
+        info!("Pre rebalance {:#?}", rebalance);
     }
 
     fn post_rebalance<'a>(&self, rebalance: &Rebalance<'a>) {
-        info!("Post rebalance {:?}", rebalance);
+        info!("Post rebalance {:#?}", rebalance);
     }
 
     fn commit_callback(&self, result: KafkaResult<()>, offsets: &TopicPartitionList) {
-        info!("Committing offsets: {:?}", result);
+        info!("Committing result : {:#?}  offsets: {:#?}", result , offsets);
     }
 }
 
