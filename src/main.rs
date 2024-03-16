@@ -2,7 +2,9 @@ use std::env;
 use std::fmt::{Debug, Display, Formatter};
 
 use actix_web::middleware::Logger;
-use actix_web::{middleware, post, web, App, HttpResponse, HttpServer, Responder, ResponseError, HttpRequest};
+use actix_web::{
+    middleware, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError,
+};
 use derive_more::{Display, Error};
 use dotenv::dotenv;
 use log::{debug, error, info};
@@ -33,7 +35,7 @@ struct RequestData {
     pub message: Value,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug,Display, Error)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Display, Error)]
 struct Error {
     message: String,
 }
@@ -58,11 +60,17 @@ impl Responder for Rest2KafkaResponse {
 
 type Rest2KafkaResult = Result<Rest2KafkaResponse, Rest2KafkaError>;
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug,Display, Error)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Display, Error)]
 struct Rest2KafkaError {
     message: String,
 }
-
+impl Rest2KafkaError {
+    pub fn new(message: &str) -> Rest2KafkaError {
+        Rest2KafkaError {
+            message: message.to_string(),
+        }
+    }
+}
 impl ResponseError for Rest2KafkaError {
     fn status_code(&self) -> actix_web::http::StatusCode {
         actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
@@ -91,7 +99,7 @@ async fn post_message_to_kafka(
     producer: &rdkafka::producer::FutureProducer,
     topic_name: &String,
     message: &Value,
-) {
+) -> OwnedDeliveryResult {
     let result = producer
         .send(
             rdkafka::producer::FutureRecord::to(topic_name)
@@ -100,7 +108,7 @@ async fn post_message_to_kafka(
             Timeout::After(std::time::Duration::from_secs(0)),
         )
         .await;
-    let _r = log_produce_result(topic_name, result.clone());
+    result
 }
 
 #[post("/post_message")]
@@ -110,13 +118,22 @@ async fn post_message_handle(
 ) -> Rest2KafkaResult {
     debug!("Post message handle : {:#?}", req_body);
 
-    //let producer: rdkafka::producer::FutureProducer =
-    //    state.client_config.create().expect("Producer creation error");
-
-    post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
-
-    let response = Rest2KafkaResponse::new("Message sent to Kafka");
-    Ok(response)
+    let result =
+        post_message_to_kafka(&state.producer, &req_body.topic_name, &req_body.message).await;
+    return match result {
+        Ok(result) => {
+            //log_produce_result(&req_body.topic_name, result);
+            let response = Rest2KafkaResponse::new(&format!(
+                "Message sent to Kafka with topic : {}  partition [{}] @ offset {}",
+                &req_body.topic_name, result.0, result.1
+            ));
+            Ok(response)
+        }
+        Err(err) => Err(Rest2KafkaError::new(&format!(
+            "Error sending message to Kafka : {:?}",
+            err
+        ))),
+    };
 }
 
 #[actix_web::main]
