@@ -1,12 +1,11 @@
 use std::env;
 
-use actix_web::{post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpResponse, HttpServer, post, Responder, web};
 use dotenv::dotenv;
-use kafka::client::{
-    Compression, KafkaClient, RequiredAcks, DEFAULT_CONNECTION_IDLE_TIMEOUT_MILLIS,
-};
-use kafka::producer::{AsBytes, Producer, Record, DEFAULT_ACK_TIMEOUT_MILLIS};
 use log::{debug, error, info};
+use rdkafka::ClientConfig;
+use rdkafka::error::KafkaError;
+use rdkafka::message::OwnedMessage;
 use serde_json::Value;
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -24,6 +23,21 @@ struct RequestData {
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 struct Response {}
 
+
+fn log_produce_result(
+    topic: &str,
+    result: Result<(i32, i64), (KafkaError, OwnedMessage)>,
+) -> Result<(), ()> {
+    result
+        .and_then(|(p, o)| {
+            info!(
+                "Successfully produced record to topic {} partition [{}] @ offset {}",
+                topic, p, o
+            );
+            Ok(())
+        })
+        .map_err(|(err, _)| error!("kafka error: {}", err))
+}
 async fn post_message_to_kafka(topic_name: &String, message: &Value) {}
 
 #[post("/post_message")]
@@ -57,17 +71,14 @@ async fn main() -> std::io::Result<()> {
     info!("Starting server at 0.0.0.0:{}", port);
     debug!("Kafak config = :{:#?}", kafka_config);
 
-    let mut client = KafkaClient::new(vec![kafka_config.bootstrap_servers.clone()]);
-    client.set_client_id("kafka-rust-console-producer".into());
-    let result = client.load_metadata_all();
-    match result {
-        Ok(_) => {
-            info!("Kafka client connected successfully");
-        }
-        Err(e) => {
-            error!("Kafka client connection failed : {:#?}", e);
-        }
-    }
+    let mut config = ClientConfig::new();
+    config.set("bootstrap.servers", &kafka_config.bootstrap_servers);
+    config.set("security.protocol", "sasl_ssl");
+    config.set("sasl.mechanisms", "PLAIN");
+    config.set("sasl.username", "$ConnectionString");
+    config.set("sasl.password", &kafka_config.connection_string);
+
+    let producer: rdkafka::producer::FutureProducer = config.create().expect("Producer creation error");
 
     HttpServer::new(|| App::new().service(post_message_handle))
         .bind(("0.0.0.0", port))?
