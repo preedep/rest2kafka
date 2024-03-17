@@ -1,23 +1,21 @@
-mod utils;
-
 use std::env;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug};
 
-use actix_web::middleware::Logger;
 use actix_web::{
-    middleware, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError,
+    App, HttpRequest, HttpResponse, HttpServer, middleware, post, Responder, ResponseError, web,
 };
-use derive_more::{Display, Error};
+use actix_web::middleware::Logger;
 use dotenv::dotenv;
 use log::{debug, error, info};
-use rdkafka::error::KafkaError;
-use rdkafka::message::OwnedMessage;
+use rdkafka::ClientConfig;
 use rdkafka::producer::future_producer::OwnedDeliveryResult;
 use rdkafka::util::Timeout;
-use rdkafka::ClientConfig;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
 use crate::utils::KafkaConfig;
+
+mod utils;
 
 // This struct represents state
 struct AppState {
@@ -25,8 +23,7 @@ struct AppState {
     //client_config: rdkafka::ClientConfig,
 }
 
-
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 struct RequestData {
     #[serde(rename = "topicName")]
     pub topic_name: String,
@@ -34,14 +31,16 @@ struct RequestData {
     pub message: Value,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Display, Error)]
+#[derive(Deserialize, Serialize, Clone, Debug, derive_more::Display, derive_more::Error)]
 struct Error {
     message: String,
 }
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 struct Rest2KafkaResponse {
     pub message: String,
 }
+
 impl Rest2KafkaResponse {
     pub fn new(message: &str) -> Rest2KafkaResponse {
         Rest2KafkaResponse {
@@ -49,6 +48,7 @@ impl Rest2KafkaResponse {
         }
     }
 }
+
 impl Responder for Rest2KafkaResponse {
     type Body = actix_web::body::BoxBody;
 
@@ -59,10 +59,11 @@ impl Responder for Rest2KafkaResponse {
 
 type Rest2KafkaResult = Result<Rest2KafkaResponse, Rest2KafkaError>;
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Display, Error)]
+#[derive(Deserialize, Serialize, Clone, Debug, derive_more::Display, derive_more::Error)]
 struct Rest2KafkaError {
     message: String,
 }
+
 impl Rest2KafkaError {
     pub fn new(message: &str) -> Rest2KafkaError {
         Rest2KafkaError {
@@ -70,6 +71,7 @@ impl Rest2KafkaError {
         }
     }
 }
+
 impl ResponseError for Rest2KafkaError {
     fn status_code(&self) -> actix_web::http::StatusCode {
         actix_web::http::StatusCode::INTERNAL_SERVER_ERROR
@@ -108,16 +110,24 @@ async fn post_message_handle(
     return match result {
         Ok(result) => {
             //log_produce_result(&req_body.topic_name, result);
+            debug!(
+                "Message sent to Kafka with topic : {}  partition [{}] @ offset {}",
+                &req_body.topic_name, result.0, result.1
+            );
+
             let response = Rest2KafkaResponse::new(&format!(
                 "Message sent to Kafka with topic : {}  partition [{}] @ offset {}",
                 &req_body.topic_name, result.0, result.1
             ));
             Ok(response)
         }
-        Err(err) => Err(Rest2KafkaError::new(&format!(
+        Err(err) => {
+            error!("Error sending message to Kafka : {:?}", err);
+
+            Err(Rest2KafkaError::new(&format!(
             "Error sending message to Kafka : {:?}",
             err
-        ))),
+        )))},
     };
 }
 
@@ -162,7 +172,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(app_state.clone())
             .service(post_message_handle)
     })
-    .bind(("0.0.0.0", port))?
-    .run()
-    .await
+        .bind(("0.0.0.0", port))?
+        .run()
+        .await
 }
